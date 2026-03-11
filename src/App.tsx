@@ -3,16 +3,20 @@ import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 
 function App() {
-  const tasks = useQuery(api.tasks.get);
+  const projects = useQuery(api.projects.get);
   return (
     <div className="App">
       <h1>my RSS</h1>
-      {tasks === undefined ? (
+      {projects === undefined ? (
         <p>Loading...</p>
-      ) : tasks.length === 0 ? (
-        <p>No tasks yet. Add some in your Convex dashboard.</p>
+      ) : projects.length === 0 ? (
+        <p>No projects yet. Add some in your Convex dashboard.</p>
       ) : (
-        tasks.map(({ _id, text }) => <div key={_id}>{text}</div>)
+        projects.map((project) => (
+          <div key={project._id}>
+            <a href={project.url}>{project.text}</a>
+          </div>
+        ))
       )}
     </div>
   );
