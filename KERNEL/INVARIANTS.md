@@ -7,7 +7,7 @@ Invariants are properties that must remain true across all derived artifacts and
 ## INV-002: Each Tracked Item for a User has the following attributes:
 
 - UserID
-- uniqueID is the Link URL
+- uniqueID is the Link URL (therefore cannot be modified after creation)
 - status
 - date started (created)
 - date updated (modified)
