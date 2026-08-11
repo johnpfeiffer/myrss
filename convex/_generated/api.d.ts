@@ -8,7 +8,9 @@
  * @module
  */
 
-import type * as projects from "../projects.js";
+import type * as trackedItems from "../trackedItems.js";
+import type * as users from "../users.js";
+import type * as validators from "../validators.js";
 
 import type {
   ApiFromModules,
@@ -17,7 +19,9 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  projects: typeof projects;
+  trackedItems: typeof trackedItems;
+  users: typeof users;
+  validators: typeof validators;
 }>;
 
 /**
