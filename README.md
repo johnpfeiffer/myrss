@@ -5,11 +5,14 @@ A small Convex and React app for tracking progress through saved links. Each bro
 ## Features
 
 - Save an HTTP or HTTPS link using the exact submitted string.
+- Choose an initial status, defaulting to `todo`.
 - Track `todo`, `in progress`, `completed`, and `cancelled` statuses.
 - Move directly between any statuses.
 - Record ISO 8601 started, updated, completed, and cancelled dates.
-- Keep each URL unique per user while allowing different users to save the same URL.
-- Use a responsive Material UI source-list and detail layout.
+- Reject duplicate URLs per user—including variants differing only by a trailing slash—with helpful feedback.
+- Sort by modified date or URL ID in either direction and collapse the saved-links listing.
+- Confirm before changing an existing favorite to `cancelled`.
+- Change status directly in a responsive Material UI list without a separate details panel.
 
 ## Local development
 

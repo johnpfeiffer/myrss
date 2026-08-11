@@ -1,14 +1,16 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { v1 as uuidv1 } from "uuid";
 import {
   Alert,
-  AppBar,
   Box,
   Button,
-  ButtonBase,
-  Chip,
   CircularProgress,
   Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Divider,
   FormControl,
   InputLabel,
@@ -18,17 +20,21 @@ import {
   Select,
   Stack,
   TextField,
-  Toolbar,
   Typography,
 } from "@mui/material";
 import { useMutation, useQuery } from "convex/react";
+import { ConvexError } from "convex/values";
 
 import { api } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import {
   assertUuidV1,
+  assertLinkUrl,
+  sortTrackedItems,
   trackedItemStatuses,
+  type SortDirection,
   type TrackedItem,
+  type TrackedItemSortField,
   type TrackedItemStatus,
 } from "../models/trackedItem";
 import "./App.css";
@@ -37,9 +43,7 @@ const userStorageKey = "favorites.userId";
 
 interface FavoritesViewProps {
   items: TrackedItem[] | undefined;
-  selectedId: string | null;
-  onAdd: (url: string) => Promise<void>;
-  onSelect: (itemId: string) => void;
+  onAdd: (url: string, status: TrackedItemStatus) => Promise<void>;
   onStatusChange: (
     itemId: string,
     status: TrackedItemStatus,
@@ -60,64 +64,121 @@ function statusLabel(status: TrackedItemStatus): string {
 
 export function FavoritesView({
   items,
-  selectedId,
   onAdd,
-  onSelect,
   onStatusChange,
   error,
 }: FavoritesViewProps) {
   const [url, setUrl] = useState("");
+  const [initialStatus, setInitialStatus] =
+    useState<TrackedItemStatus>("todo");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const selectedItem = items?.find((item) => item._id === selectedId);
+  const [listExpanded, setListExpanded] = useState(true);
+  const [sortField, setSortField] = useState<TrackedItemSortField>("date");
+  const [sortDirection, setSortDirection] =
+    useState<SortDirection>("desc");
+  const [pendingCancellation, setPendingCancellation] = useState<{
+    itemId: string;
+    url: string;
+  } | null>(null);
+  const sortedItems = useMemo(
+    () =>
+      items ? sortTrackedItems(items, sortField, sortDirection) : undefined,
+    [items, sortDirection, sortField],
+  );
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError(null);
 
     try {
-      new URL(url);
+      assertLinkUrl(url);
     } catch {
-      setFormError("Enter a valid link URL.");
+      setFormError("Enter a valid HTTP or HTTPS link.");
       return;
     }
 
     setSubmitting(true);
     try {
-      await onAdd(url);
+      await onAdd(url, initialStatus);
       setUrl("");
+      setInitialStatus("todo");
     } catch (cause) {
       setFormError(
-        cause instanceof Error ? cause.message : "The favorite could not be added.",
+        cause instanceof ConvexError && typeof cause.data === "string"
+          ? cause.data
+          : cause instanceof Error
+            ? cause.message
+            : "The favorite could not be added.",
       );
     } finally {
       setSubmitting(false);
     }
   }
 
+  function handleStatusSelection(
+    item: TrackedItem,
+    status: TrackedItemStatus,
+  ) {
+    if (status === item.status) {
+      return;
+    }
+    if (status === "cancelled") {
+      setPendingCancellation({
+        itemId: item._id,
+        url: item.uniqueId,
+      });
+      return;
+    }
+    void onStatusChange(item._id, status);
+  }
+
+  async function confirmCancellation() {
+    if (!pendingCancellation) {
+      return;
+    }
+    await onStatusChange(pendingCancellation.itemId, "cancelled");
+    setPendingCancellation(null);
+  }
+
   return (
     <Box className="app-shell">
-      <AppBar position="static" color="transparent" elevation={0}>
-        <Toolbar>
-          <Typography component="h1" variant="h6" sx={{ flexGrow: 1 }}>
-            Favorites
-          </Typography>
-          <Typography color="text.secondary" variant="body2">
-            Keep track of what you finish
-          </Typography>
-        </Toolbar>
-        <Divider />
-      </AppBar>
+      <Container component="main" maxWidth="lg" className="page-container">
+        <Stack spacing={{ xs: 4, md: 6 }}>
+          <Stack
+            component="header"
+            direction={{ xs: "column", sm: "row" }}
+            spacing={2}
+            sx={{
+              alignItems: { xs: "flex-start", sm: "center" },
+              justifyContent: "space-between",
+            }}
+          >
+            <Typography component="h1" variant="h3" sx={{ fontWeight: 700 }}>
+              My favorite links
+            </Typography>
+            <Button
+              component="a"
+              href="https://feneky.com/links"
+              rel="noreferrer"
+              target="_blank"
+              variant="outlined"
+            >
+              Find your next great thing!
+            </Button>
+          </Stack>
 
-      <Container component="main" maxWidth="lg" sx={{ py: 3 }}>
-        <Stack spacing={2}>
           {error ? <Alert severity="error">{error}</Alert> : null}
+
           <Paper
             component="form"
             onSubmit={handleSubmit}
             variant="outlined"
-            sx={{ p: 2 }}
+            className="add-form"
           >
+            <Typography component="h2" variant="h6" sx={{ mb: 2 }}>
+              Add a favorite
+            </Typography>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
               <TextField
                 fullWidth
@@ -125,10 +186,31 @@ export function FavoritesView({
                 onChange={(event) => setUrl(event.target.value)}
                 placeholder="https://example.com/article"
                 required
+                size="small"
                 slotProps={{ htmlInput: { "aria-label": "Link URL" } }}
                 type="url"
                 value={url}
               />
+              <FormControl size="small" sx={{ minWidth: { sm: 180 } }}>
+                <InputLabel htmlFor="initial-status-select">
+                  Initial status
+                </InputLabel>
+                <Select
+                  native
+                  inputProps={{ id: "initial-status-select" }}
+                  label="Initial status"
+                  onChange={(event) =>
+                    setInitialStatus(event.target.value as TrackedItemStatus)
+                  }
+                  value={initialStatus}
+                >
+                  {trackedItemStatuses.map((status) => (
+                    <option key={status} value={status}>
+                      {statusLabel(status)}
+                    </option>
+                  ))}
+                </Select>
+              </FormControl>
               <Button
                 disabled={submitting}
                 type="submit"
@@ -145,27 +227,89 @@ export function FavoritesView({
             ) : null}
           </Paper>
 
-          <Box className="content-grid">
-            <Paper variant="outlined" className="source-panel">
-              <Box sx={{ px: 2, py: 1.5 }}>
-                <Typography component="h2" variant="subtitle1">
+          <Box component="section" aria-labelledby="saved-links-title">
+            <Stack
+              direction={{ xs: "column", md: "row" }}
+              spacing={2}
+              sx={{
+                alignItems: { xs: "stretch", md: "flex-end" },
+                justifyContent: "space-between",
+              }}
+            >
+              <Box>
+                <Typography component="h2" id="saved-links-title" variant="h5">
                   Saved links
                 </Typography>
                 <Typography color="text.secondary" variant="body2">
-                  {items ? `${items.length} total` : "Loading your favorites"}
+                  {items ? `Showing ${items.length} links` : "Loading your links"}
                 </Typography>
               </Box>
-              <Divider />
 
-              {items === undefined ? (
-                <Stack spacing={1.5} sx={{ alignItems: "center", py: 6 }}>
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={1}
+                sx={{ alignItems: { sm: "center" } }}
+              >
+                {sortedItems && sortedItems.length > 0 ? (
+                  <>
+                    <FormControl size="small" sx={{ minWidth: 156 }}>
+                      <InputLabel htmlFor="sort-field-select">Sort by</InputLabel>
+                      <Select
+                        native
+                        inputProps={{ id: "sort-field-select" }}
+                        label="Sort by"
+                        onChange={(event) =>
+                          setSortField(
+                            event.target.value as TrackedItemSortField,
+                          )
+                        }
+                        value={sortField}
+                      >
+                        <option value="date">Modified date</option>
+                        <option value="id">ID</option>
+                      </Select>
+                    </FormControl>
+                    <FormControl size="small" sx={{ minWidth: 136 }}>
+                      <InputLabel htmlFor="sort-direction-select">
+                        Direction
+                      </InputLabel>
+                      <Select
+                        native
+                        inputProps={{ id: "sort-direction-select" }}
+                        label="Direction"
+                        onChange={(event) =>
+                          setSortDirection(event.target.value as SortDirection)
+                        }
+                        value={sortDirection}
+                      >
+                        <option value="desc">Descending</option>
+                        <option value="asc">Ascending</option>
+                      </Select>
+                    </FormControl>
+                  </>
+                ) : null}
+                <Button
+                  aria-expanded={listExpanded}
+                  onClick={() => setListExpanded((expanded) => !expanded)}
+                  size="small"
+                >
+                  {listExpanded ? "Collapse list" : "Expand list"}
+                </Button>
+              </Stack>
+            </Stack>
+
+            <Divider sx={{ mt: 2 }} />
+
+            {listExpanded ? (
+              sortedItems === undefined ? (
+                <Stack spacing={1.5} sx={{ alignItems: "center", py: 7 }}>
                   <CircularProgress size={28} />
                   <Typography color="text.secondary" variant="body2">
                     Loading…
                   </Typography>
                 </Stack>
-              ) : items.length === 0 ? (
-                <Box sx={{ px: 2, py: 6, textAlign: "center" }}>
+              ) : sortedItems.length === 0 ? (
+                <Box sx={{ py: 7, textAlign: "center" }}>
                   <Typography>No favorites yet</Typography>
                   <Typography color="text.secondary" variant="body2">
                     Add a link above to start tracking it.
@@ -173,137 +317,83 @@ export function FavoritesView({
                 </Box>
               ) : (
                 <List disablePadding>
-                  {items.map((item, index) => (
+                  {sortedItems.map((item) => (
                     <ListItem disablePadding key={item._id}>
-                      <ButtonBase
-                        aria-label={item.uniqueId}
-                        onClick={() => onSelect(item._id)}
-                        className={`source-button${
-                          item._id === selectedId ? " Mui-selected" : ""
-                        }`}
-                      >
-                        <Stack
-                          spacing={1}
-                          sx={{ alignItems: "flex-start", width: "100%" }}
+                      <Box className="link-row">
+                        <Typography
+                          component="a"
+                          color="primary"
+                          href={item.uniqueId}
+                          rel="noreferrer"
+                          target="_blank"
+                          variant="h6"
+                          className="link-title"
                         >
-                          <Typography className="source-url" variant="body2">
-                            {item.uniqueId}
+                          {item.uniqueId}
+                        </Typography>
+                        <Stack
+                          direction={{ xs: "column", sm: "row" }}
+                          spacing={{ xs: 1, sm: 2 }}
+                          sx={{ alignItems: { xs: "flex-start", sm: "center" } }}
+                        >
+                          <FormControl size="small" sx={{ minWidth: 148 }}>
+                            <Select
+                              native
+                              inputProps={{
+                                "aria-label": `Status for ${item.uniqueId}`,
+                              }}
+                              onChange={(event) =>
+                                handleStatusSelection(
+                                  item,
+                                  event.target.value as TrackedItemStatus,
+                                )
+                              }
+                              value={item.status}
+                            >
+                              {trackedItemStatuses.map((status) => (
+                                <option key={status} value={status}>
+                                  {statusLabel(status)}
+                                </option>
+                              ))}
+                            </Select>
+                          </FormControl>
+                          <Typography color="text.secondary" variant="body2">
+                            Updated {readableDate(item.dateUpdated)}
                           </Typography>
-                          <Stack
-                            direction="row"
-                            sx={{
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              width: "100%",
-                            }}
-                          >
-                            <Chip label={statusLabel(item.status)} size="small" />
-                            <Typography color="text.secondary" variant="caption">
-                              {readableDate(item.dateUpdated)}
-                            </Typography>
-                          </Stack>
                         </Stack>
-                      </ButtonBase>
-                      {index < items.length - 1 ? <Divider /> : null}
+                      </Box>
+                      <Divider />
                     </ListItem>
                   ))}
                 </List>
-              )}
-            </Paper>
-
-            <Paper variant="outlined" className="detail-panel">
-              {selectedItem ? (
-                <Stack spacing={3}>
-                  <Box>
-                    <Typography color="text.secondary" variant="overline">
-                      Link details
-                    </Typography>
-                    <Typography
-                      component="a"
-                      href={selectedItem.uniqueId}
-                      rel="noreferrer"
-                      target="_blank"
-                      variant="h6"
-                      className="detail-link"
-                    >
-                      {selectedItem.uniqueId}
-                    </Typography>
-                  </Box>
-
-                  <FormControl fullWidth>
-                    <InputLabel htmlFor="status-select">Status</InputLabel>
-                    <Select
-                      native
-                      inputProps={{ id: "status-select" }}
-                      label="Status"
-                      onChange={(event) =>
-                        void onStatusChange(
-                          selectedItem._id,
-                          event.target.value as TrackedItemStatus,
-                        )
-                      }
-                      value={selectedItem.status}
-                    >
-                      {trackedItemStatuses.map((status) => (
-                        <option key={status} value={status}>
-                          {statusLabel(status)}
-                        </option>
-                      ))}
-                    </Select>
-                  </FormControl>
-
-                  <Divider />
-                  <Stack spacing={1.5}>
-                    <DateRow label="Started" value={selectedItem.dateStarted} />
-                    <DateRow label="Updated" value={selectedItem.dateUpdated} />
-                    {selectedItem.dateCompleted ? (
-                      <DateRow
-                        label="Completed"
-                        value={selectedItem.dateCompleted}
-                      />
-                    ) : null}
-                    {selectedItem.dateCancelled ? (
-                      <DateRow
-                        label="Cancelled"
-                        value={selectedItem.dateCancelled}
-                      />
-                    ) : null}
-                  </Stack>
-                </Stack>
-              ) : (
-                <Stack
-                  sx={{
-                    alignItems: "center",
-                    justifyContent: "center",
-                    minHeight: 240,
-                  }}
-                >
-                  <Typography>Select a saved link</Typography>
-                  <Typography color="text.secondary" variant="body2">
-                    Its status and dates will appear here.
-                  </Typography>
-                </Stack>
-              )}
-            </Paper>
+              )
+            ) : null}
           </Box>
         </Stack>
       </Container>
-    </Box>
-  );
-}
 
-function DateRow({ label, value }: { label: string; value: string }) {
-  return (
-    <Stack
-      direction="row"
-      spacing={2}
-      sx={{ justifyContent: "space-between" }}
-    >
-      <Typography color="text.secondary" variant="body2">
-        {label}
-      </Typography>
-      <Typography variant="body2">{readableDate(value)}</Typography>
-    </Stack>
+      <Dialog
+        aria-labelledby="cancel-dialog-title"
+        onClose={() => setPendingCancellation(null)}
+        open={pendingCancellation !== null}
+      >
+        <DialogTitle id="cancel-dialog-title">Cancel favorite?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This will mark {pendingCancellation?.url} as cancelled. You can
+            change its status again later.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPendingCancellation(null)}>
+            Keep current status
+          </Button>
+          <Button color="error" onClick={() => void confirmCancellation()}>
+            Cancel favorite
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 }
 
@@ -325,7 +415,6 @@ function getOrCreateUserId(): string {
 
 function App() {
   const [userId] = useState(getOrCreateUserId);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const ensureUser = useMutation(api.users.ensure);
   const addFavorite = useMutation(api.trackedItems.add);
@@ -338,11 +427,10 @@ function App() {
     });
   }, [ensureUser, userId]);
 
-  async function handleAdd(url: string) {
+  async function handleAdd(url: string, status: TrackedItemStatus) {
     setError(null);
     await ensureUser({ userId });
-    const item = await addFavorite({ userId, url });
-    setSelectedId(item._id);
+    await addFavorite({ userId, url, status });
   }
 
   async function handleStatusChange(
@@ -369,9 +457,7 @@ function App() {
       error={error}
       items={items}
       onAdd={handleAdd}
-      onSelect={setSelectedId}
       onStatusChange={handleStatusChange}
-      selectedId={selectedId}
     />
   );
 }

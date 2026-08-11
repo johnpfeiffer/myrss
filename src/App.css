@@ -7,52 +7,40 @@
   background: #fff;
 }
 
-.content-grid {
-  display: grid;
-  grid-template-columns: minmax(280px, 2fr) minmax(320px, 3fr);
-  gap: 16px;
-  align-items: start;
+.page-container {
+  padding-top: 64px;
+  padding-bottom: 64px;
 }
 
-.source-panel,
-.detail-panel {
-  overflow: hidden;
-}
-
-.detail-panel {
+.add-form {
   padding: 24px;
 }
 
-.source-button {
-  display: flex;
+.link-row {
   width: 100%;
   min-width: 0;
-  padding: 16px;
-  text-align: left;
+  padding: 24px 0;
 }
 
-.source-button.Mui-selected {
-  background: rgba(25, 118, 210, 0.08);
-}
-
-.source-url,
-.detail-link {
-  overflow-wrap: anywhere;
-}
-
-.detail-link {
+.link-title {
   display: block;
-  color: inherit;
+  margin-bottom: 12px;
+  overflow-wrap: anywhere;
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
 }
 
 @media (max-width: 700px) {
-  .content-grid {
-    grid-template-columns: 1fr;
+  .page-container {
+    padding-top: 32px;
+    padding-bottom: 40px;
   }
 
-  .detail-panel {
+  .add-form {
     padding: 16px;
+  }
+
+  .link-row {
+    padding: 20px 0;
   }
 }

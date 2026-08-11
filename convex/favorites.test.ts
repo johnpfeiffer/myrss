@@ -37,16 +37,17 @@ describe("favorites API", () => {
       userId: userOne,
       url: submittedUrl,
     });
-    const duplicate = await t.mutation(api.trackedItems.add, {
-      userId: userOne,
-      url: submittedUrl,
-    });
+    await expect(
+      t.mutation(api.trackedItems.add, {
+        userId: userOne,
+        url: submittedUrl,
+      }),
+    ).rejects.toThrow(/already/i);
     const otherUsersCopy = await t.mutation(api.trackedItems.add, {
       userId: userTwo,
       url: submittedUrl,
     });
 
-    expect(duplicate._id).toBe(first._id);
     expect(otherUsersCopy._id).not.toBe(first._id);
     expect(first).toMatchObject({
       userId: userOne,
@@ -58,6 +59,30 @@ describe("favorites API", () => {
     expect(first.dateCancelled).toBeUndefined();
     expect(new Date(first.dateStarted).toISOString()).toBe(first.dateStarted);
   });
+
+  test.each([
+    ["https://example.com/article/", "https://example.com/article"],
+    ["https://example.com/article/?ref=one", "https://example.com/article?ref=one"],
+  ])(
+    "treats %s and %s as trailing-slash duplicates",
+    async (submittedUrl, duplicateUrl) => {
+      const t = convexTest(schema, modules);
+      await t.mutation(api.users.ensure, { userId: userOne });
+
+      const first = await t.mutation(api.trackedItems.add, {
+        userId: userOne,
+        url: submittedUrl,
+      });
+
+      await expect(
+        t.mutation(api.trackedItems.add, {
+          userId: userOne,
+          url: duplicateUrl,
+        }),
+      ).rejects.toThrow(/already/i);
+      expect(first.uniqueId).toBe(submittedUrl);
+    },
+  );
 
   test.each(["todo", "in progress", "completed", "cancelled"] as const)(
     "allows a direct transition to %s",
@@ -87,6 +112,45 @@ describe("favorites API", () => {
       }
     },
   );
+
+  test.each(["todo", "in progress", "completed", "cancelled"] as const)(
+    "creates an item with selected initial status %s",
+    async (status) => {
+      const t = convexTest(schema, modules);
+      await t.mutation(api.users.ensure, { userId: userOne });
+
+      const item = await t.mutation(api.trackedItems.add, {
+        userId: userOne,
+        url: `https://example.com/initial-${encodeURIComponent(status)}`,
+        status,
+      });
+
+      expect(item.status).toBe(status);
+      if (status === "completed") {
+        expect(item.dateCompleted).toBe(item.dateUpdated);
+      }
+      if (status === "cancelled") {
+        expect(item.dateCancelled).toBe(item.dateUpdated);
+      }
+    },
+  );
+
+  test("treats a change to the current status as a no-op", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(api.users.ensure, { userId: userOne });
+    const item = await t.mutation(api.trackedItems.add, {
+      userId: userOne,
+      url: "https://example.com/no-op",
+    });
+
+    const unchanged = await t.mutation(api.trackedItems.updateStatus, {
+      userId: userOne,
+      itemId: item._id,
+      status: item.status,
+    });
+
+    expect(unchanged).toEqual(item);
+  });
 
   test("only lists items owned by the requested user", async () => {
     const t = convexTest(schema, modules);

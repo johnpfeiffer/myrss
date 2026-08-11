@@ -47,6 +47,13 @@ A user can sort the list (either descending or ascending) of tracked items by Da
 
 - A user changing a status to the same thing is a no op
 - If a User tries to add a duplicate Item, do not allow it, and provide a helpful error message
+
+URLs differing only by one trailing slash count as duplicates
+
 - If a User wants to change the status to Cancelled, in the UI, provide an extra confirmation UI
 
+
+## MVP 1.1 UI
+
+have a link to https://feneky.com/links with the phrase "Find your next great thing!"
 
