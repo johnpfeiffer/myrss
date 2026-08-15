@@ -41,6 +41,6 @@ An item's `uniqueId` cannot be changed after creation.
 
 ## Architecture mapping
 
-- `models/`: framework-independent domain types and rules.
-- `convex/`: persistence schema and controllers (queries and mutations).
-- `src/`: React/Material UI presentation and client orchestration.
+- `app/models/`: framework-independent domain types and rules.
+- `app/convex/`: persistence schema and controllers (queries and mutations).
+- `app/src/`: React/Material UI presentation and client orchestration.

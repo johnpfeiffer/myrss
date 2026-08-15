@@ -4,7 +4,7 @@ This document describes the implementation derived from `/KERNEL/`. The kernel r
 
 ## System design
 
-The app follows a small domain-driven MVC split. Framework-independent rules live in `models/`; Convex queries and mutations act as controllers around durable storage; React and Material UI provide the presentation.
+The runnable project lives under `app/` for incorporation into the `codespaces-react` monorepo. Framework-independent rules live in `app/models/`; `app/convex/` queries and mutations act as controllers around durable storage; `app/src/` contains the React and Material UI presentation.
 
 The presentation is a single, spacious page organized into three levels: a strong page header with the Feneky call-to-action, a compact outlined add form, and a divider-based saved-links section. Link URLs receive the strongest visual emphasis; status controls and locally formatted update dates stay on the quieter second line. Material UI supplies the palette, typography, inputs, dialogs, and responsive behavior, with CSS limited to layout and spacing.
 

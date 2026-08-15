@@ -18,6 +18,7 @@ These checks are derived proof obligations. They do not supersede `/KERNEL/`.
 ## Commands
 
 ```sh
+cd app
 npm test
 npm run typecheck:convex
 npm run lint

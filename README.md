@@ -19,6 +19,7 @@ A small Convex and React app for tracking progress through saved links. Each bro
 Requirements: a current Node.js release supported by Vite and a Convex account.
 
 ```sh
+cd app
 npm install
 npx convex dev
 ```
@@ -26,6 +27,7 @@ npx convex dev
 The first `convex dev` run connects or creates a Convex project, deploys the schema and functions, generates the typed client API, and writes `VITE_CONVEX_URL` to `.env.local`. Keep that command running and start the UI in another terminal:
 
 ```sh
+cd app
 npm run dev
 ```
 
@@ -34,6 +36,7 @@ Open the local address printed by Vite.
 ## Validation
 
 ```sh
+cd app
 npm test
 npm run typecheck:convex
 npm run lint
@@ -42,6 +45,18 @@ npm audit
 ```
 
 `npm test` exercises the public Convex functions with `convex-test` and verifies the main user-visible UI states with Testing Library.
+
+## Monorepo deployment
+
+The runnable project lives in `app/`. From the repository root, copy its deployment-safe files into the sibling `codespaces-react` monorepo:
+
+```sh
+./cloud-deploy.sh
+```
+
+This targets `../codespaces-react/apps/track-favorites/` and excludes dependencies, build output, local environment files, and tests. The monorepo build environment must provide `VITE_CONVEX_URL` for the intended Convex deployment.
+
+Set `DEST` to override the copy destination for validation or another checkout.
 
 ## Identity note
 
