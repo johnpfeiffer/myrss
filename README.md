@@ -13,7 +13,9 @@ A small Convex and React app for tracking progress through saved links. Each bro
 - Sort by modified date or URL ID in either direction and collapse the saved-links listing.
 - Confirm before changing an existing favorite to `cancelled`.
 - Change status directly in a responsive Material UI list without a separate details panel.
-- Open a dedicated knowledge-graph view of the imported favorite entities and relationships.
+- Explore imported entities in connected clusters where node size and placement
+  emphasize highly connected hubs.
+- Select or deselect relationship types without moving the graph nodes.
 
 ## Local development
 
@@ -38,6 +40,9 @@ The graph viewer is available from the **View favorites graph** button or at the
 relative `graph` route (for example, `/favorites/graph` when the app is mounted
 at `/favorites/`). Its deployable data snapshot lives in `app/src/graph/data/`
 and is derived from the ignored source files in `app/IMPORT/graph/`.
+All five relationship types start selected. Select a colored relationship chip
+to remove or restore that type's edges while keeping the clustered layout stable.
+The color-matched number below each chip shows that type's total edge count.
 
 ## Validation
 

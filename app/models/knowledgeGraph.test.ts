@@ -30,4 +30,31 @@ describe("knowledge graph model", () => {
       "Current employee of",
     );
   });
+
+  test("clusters connected entities and places hubs inside their edge nodes", () => {
+    const graph = createKnowledgeGraph(
+      [
+        { id: "hub", name: "Hub" },
+        { id: "leaf-a", name: "Leaf A" },
+        { id: "leaf-b", name: "Leaf B" },
+        { id: "leaf-c", name: "Leaf C" },
+      ],
+      [
+        { source: "hub", target: "leaf-a", type: "Author_of" },
+        { source: "hub", target: "leaf-b", type: "Author_of" },
+        { source: "hub", target: "leaf-c", type: "Author_of" },
+      ],
+    );
+    const layout = layoutKnowledgeGraph(graph);
+    const component = layout.components[0];
+    const hub = layout.entities.find((entity) => entity.id === "hub");
+    const leaf = layout.entities.find((entity) => entity.id === "leaf-a");
+
+    expect(layout.components).toHaveLength(1);
+    expect(hub?.degree).toBe(3);
+    expect(leaf?.degree).toBe(1);
+    expect(Math.hypot((hub?.x ?? 0) - component.x, (hub?.y ?? 0) - component.y)).toBeLessThan(
+      Math.hypot((leaf?.x ?? 0) - component.x, (leaf?.y ?? 0) - component.y),
+    );
+  });
 });

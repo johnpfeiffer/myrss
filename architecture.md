@@ -6,7 +6,7 @@ This document describes the implementation derived from `/KERNEL/`. The kernel r
 
 The runnable project lives under `app/` for incorporation into the `codespaces-react` monorepo. Framework-independent rules live in `app/models/`; `app/convex/` queries and mutations act as controllers around durable storage; `app/src/` contains the React and Material UI presentation.
 
-The primary presentation is a spacious page organized into three levels: a strong page header with the Feneky and graph actions, a compact outlined add form, and a divider-based saved-links section. Link URLs receive the strongest visual emphasis; status controls and locally formatted update dates stay on the quieter second line. A relative `graph` route opens a dedicated, read-only knowledge-graph submodule. It renders the imported entities and typed relationships as a responsive SVG with MUI colors and an accessible text representation. Material UI supplies the palette, typography, inputs, dialogs, and responsive behavior, with CSS limited to layout and spacing.
+The primary presentation is a spacious page organized into three levels: a strong page header with the Feneky and graph actions, a compact outlined add form, and a divider-based saved-links section. Link URLs receive the strongest visual emphasis; status controls and locally formatted update dates stay on the quieter second line. A relative `graph` route opens a dedicated, read-only knowledge-graph submodule. It renders connected components as separate SVG clusters, places high-degree hubs near cluster centers, moves low-degree entities toward cluster edges, and scales node circles by degree. Relationship-type chips hide or restore edges without moving nodes, preserving the user's visual map while reducing clutter. Each chip and its centered, color-matched total form a compact filter column. Material UI supplies the palette, typography, inputs, dialogs, and responsive behavior, with CSS limited to layout and spacing.
 
 ```mermaid
 flowchart LR
@@ -20,7 +20,9 @@ flowchart LR
     DB --> API --> Controller --> View
     Import["Ignored IMPORT/graph sources"] --> Snapshot["Deployable graph JSON snapshot"]
     Snapshot --> GraphDomain["Graph validation + layout model"]
-    GraphDomain --> GraphView["Accessible SVG graph view"]
+    GraphDomain --> Layout["Connected components + degree layout"]
+    Layout --> GraphView["Accessible SVG graph view"]
+    Filters["Relationship-type selection"] --> GraphView
 ```
 
 ## Data model
@@ -60,7 +62,11 @@ sequenceDiagram
     User->>UI: Open View favorites graph
     UI-->>User: Navigate to relative graph route
     User->>UI: Follow typed entity relationships
-    UI-->>User: Render accessible SVG graph
+    UI-->>User: Render clustered accessible SVG graph
+    User->>UI: Deselect a relationship type
+    UI-->>User: Remove matching edges; keep nodes fixed
+    User->>UI: Select the relationship type again
+    UI-->>User: Restore matching edges
     User->>UI: Return to favorites
     User->>UI: Choose a new status inline
     alt Status is unchanged
@@ -81,8 +87,8 @@ sequenceDiagram
 ## Validation strategy
 
 - Convex API tests prove UUIDv1 validation, idempotent users, exact and trailing-slash duplicate rejection, selectable initial status, same-status no-ops, ownership-scoped reads, ISO timestamps, and unrestricted status transitions.
-- Presentation tests prove the Feneky and graph header links, loading and empty feedback, exact URL and initial-status submission, duplicate feedback, Date/ID sorting, listing collapse, inline status changes, cancellation confirmation, graph rendering, and absence of a detail panel.
-- Graph model tests prove dangling relationships are rejected and all valid entities receive a layout position.
+- Presentation tests prove the Feneky and graph header links, loading and empty feedback, exact URL and initial-status submission, duplicate feedback, Date/ID sorting, listing collapse, inline status changes, cancellation confirmation, graph rendering, relationship filtering, and absence of a detail panel.
+- Graph model tests prove dangling relationships are rejected, all valid entities receive a layout position, connected entities cluster together, and hubs sit inside their lower-degree neighbors.
 - TypeScript production builds verify the generated Convex data model and UI integration.
 - ESLint and npm audit cover static quality and known dependency advisories.
 
