@@ -42,8 +42,11 @@ describe("FavoritesView", () => {
     );
     expect(screen.getByText("No favorites yet")).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "Find your next great thing!" }),
+      screen.getByRole("link", { name: "Find your next thing" }),
     ).toHaveAttribute("href", "https://feneky.com/links");
+    expect(
+      screen.getByRole("link", { name: "View favorites graph" }),
+    ).toHaveAttribute("href", "graph");
     expect(
       screen.queryByText("Keep track of what you finish"),
     ).not.toBeInTheDocument();

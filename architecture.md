@@ -6,7 +6,7 @@ This document describes the implementation derived from `/KERNEL/`. The kernel r
 
 The runnable project lives under `app/` for incorporation into the `codespaces-react` monorepo. Framework-independent rules live in `app/models/`; `app/convex/` queries and mutations act as controllers around durable storage; `app/src/` contains the React and Material UI presentation.
 
-The presentation is a single, spacious page organized into three levels: a strong page header with the Feneky call-to-action, a compact outlined add form, and a divider-based saved-links section. Link URLs receive the strongest visual emphasis; status controls and locally formatted update dates stay on the quieter second line. Material UI supplies the palette, typography, inputs, dialogs, and responsive behavior, with CSS limited to layout and spacing.
+The primary presentation is a spacious page organized into three levels: a strong page header with the Feneky and graph actions, a compact outlined add form, and a divider-based saved-links section. Link URLs receive the strongest visual emphasis; status controls and locally formatted update dates stay on the quieter second line. A relative `graph` route opens a dedicated, read-only knowledge-graph submodule. It renders the imported entities and typed relationships as a responsive SVG with MUI colors and an accessible text representation. Material UI supplies the palette, typography, inputs, dialogs, and responsive behavior, with CSS limited to layout and spacing.
 
 ```mermaid
 flowchart LR
@@ -18,6 +18,9 @@ flowchart LR
     Schema["Convex schema + validators"] --> DB
     Domain --> API
     DB --> API --> Controller --> View
+    Import["Ignored IMPORT/graph sources"] --> Snapshot["Deployable graph JSON snapshot"]
+    Snapshot --> GraphDomain["Graph validation + layout model"]
+    GraphDomain --> GraphView["Accessible SVG graph view"]
 ```
 
 ## Data model
@@ -54,6 +57,11 @@ sequenceDiagram
     end
     User->>UI: Sort or collapse the listing
     UI-->>UI: Reorder or hide rows locally
+    User->>UI: Open View favorites graph
+    UI-->>User: Navigate to relative graph route
+    User->>UI: Follow typed entity relationships
+    UI-->>User: Render accessible SVG graph
+    User->>UI: Return to favorites
     User->>UI: Choose a new status inline
     alt Status is unchanged
         UI-->>UI: No operation
@@ -73,7 +81,8 @@ sequenceDiagram
 ## Validation strategy
 
 - Convex API tests prove UUIDv1 validation, idempotent users, exact and trailing-slash duplicate rejection, selectable initial status, same-status no-ops, ownership-scoped reads, ISO timestamps, and unrestricted status transitions.
-- Presentation tests prove the Feneky header link, loading and empty feedback, exact URL and initial-status submission, duplicate feedback, Date/ID sorting, listing collapse, inline status changes, cancellation confirmation, and absence of a detail panel.
+- Presentation tests prove the Feneky and graph header links, loading and empty feedback, exact URL and initial-status submission, duplicate feedback, Date/ID sorting, listing collapse, inline status changes, cancellation confirmation, graph rendering, and absence of a detail panel.
+- Graph model tests prove dangling relationships are rejected and all valid entities receive a layout position.
 - TypeScript production builds verify the generated Convex data model and UI integration.
 - ESLint and npm audit cover static quality and known dependency advisories.
 

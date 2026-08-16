@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+} from "react";
 import { v1 as uuidv1 } from "uuid";
 import {
   Alert,
@@ -40,6 +47,7 @@ import {
 import "./App.css";
 
 const userStorageKey = "favorites.userId";
+const KnowledgeGraphPage = lazy(() => import("./graph/KnowledgeGraph"));
 
 interface FavoritesViewProps {
   items: TrackedItem[] | undefined;
@@ -157,15 +165,26 @@ export function FavoritesView({
             <Typography component="h1" variant="h3" sx={{ fontWeight: 700 }}>
               My favorite links
             </Typography>
-            <Button
-              component="a"
-              href="https://feneky.com/links"
-              rel="noreferrer"
-              target="_blank"
-              variant="outlined"
-            >
-              Find your next great thing!
-            </Button>
+            <Stack spacing={1} sx={{ alignItems: { xs: "stretch", sm: "flex-end" } }}>
+              <Button
+                component="a"
+                href="https://feneky.com/links"
+                rel="noreferrer"
+                target="_blank"
+                variant="outlined"
+                sx={{ textTransform: "none" }}
+              >
+                Find your next thing
+              </Button>
+              <Button
+                component="a"
+                href="graph"
+                size="small"
+                sx={{ textTransform: "none" }}
+              >
+                View favorites graph
+              </Button>
+            </Stack>
           </Stack>
 
           {error ? <Alert severity="error">{error}</Alert> : null}
@@ -413,7 +432,7 @@ function getOrCreateUserId(): string {
   return userId;
 }
 
-function App() {
+function FavoritesController() {
   const [userId] = useState(getOrCreateUserId);
   const [error, setError] = useState<string | null>(null);
   const ensureUser = useMutation(api.users.ensure);
@@ -459,6 +478,31 @@ function App() {
       onAdd={handleAdd}
       onStatusChange={handleStatusChange}
     />
+  );
+}
+
+function App() {
+  const path = window.location.pathname.replace(/\/+$/, "");
+
+  return path.endsWith("/graph") ? (
+    <Suspense
+      fallback={
+        <Box className="app-shell">
+          <Container component="main" maxWidth="lg" className="page-container">
+            <Stack spacing={1.5} sx={{ alignItems: "center", py: 7 }}>
+              <CircularProgress size={28} />
+              <Typography color="text.secondary" variant="body2">
+                Loading graph…
+              </Typography>
+            </Stack>
+          </Container>
+        </Box>
+      }
+    >
+      <KnowledgeGraphPage />
+    </Suspense>
+  ) : (
+    <FavoritesController />
   );
 }
 

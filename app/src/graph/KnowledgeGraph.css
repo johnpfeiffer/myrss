@@ -1,0 +1,11 @@
+.knowledge-graph-frame {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.knowledge-graph-svg {
+  display: block;
+  width: 100%;
+  min-width: 1080px;
+  height: auto;
+}

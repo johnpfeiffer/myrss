@@ -13,6 +13,7 @@ A small Convex and React app for tracking progress through saved links. Each bro
 - Sort by modified date or URL ID in either direction and collapse the saved-links listing.
 - Confirm before changing an existing favorite to `cancelled`.
 - Change status directly in a responsive Material UI list without a separate details panel.
+- Open a dedicated knowledge-graph view of the imported favorite entities and relationships.
 
 ## Local development
 
@@ -33,6 +34,11 @@ npm run dev
 
 Open the local address printed by Vite.
 
+The graph viewer is available from the **View favorites graph** button or at the
+relative `graph` route (for example, `/favorites/graph` when the app is mounted
+at `/favorites/`). Its deployable data snapshot lives in `app/src/graph/data/`
+and is derived from the ignored source files in `app/IMPORT/graph/`.
+
 ## Validation
 
 ```sh
@@ -44,7 +50,9 @@ npm run build
 npm audit
 ```
 
-`npm test` exercises the public Convex functions with `convex-test` and verifies the main user-visible UI states with Testing Library.
+`npm test` exercises the public Convex functions with `convex-test`, verifies the
+main user-visible UI states with Testing Library, and checks graph validation and
+rendering.
 
 ## Monorepo deployment
 
