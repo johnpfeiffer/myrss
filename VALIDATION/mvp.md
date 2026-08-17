@@ -16,6 +16,8 @@ These checks are derived proof obligations. They do not supersede `/KERNEL/`.
 | Same-status no-op | Updating to the current status returns the unchanged item and dates. |
 | Convex integration | Schema, query, and mutation code type-checks against generated Convex types. |
 | Presentation | UI tests cover the Feneky header link, loading, empty, initial status, duplicate feedback, collapse, Date/ID sorting, inline status handling, and cancellation confirmation without a detail panel. JWT helper tests cover profile decoding and expiry rejection. |
+| Google localhost compatibility | The HTML entry point supplies Google's required `no-referrer-when-downgrade` policy for HTTP localhost development. |
+| Convex token lifecycle | A still-valid Google JWT is reused when Convex requests a forced token fetch; malformed or nearly expired JWTs are rejected. |
 
 ## Commands
 

@@ -1,6 +1,10 @@
 import { describe, expect, test } from "vitest";
 
-import { decodeGoogleCredential, isCredentialUsable } from "./googleAuth";
+import {
+  convexAccessToken,
+  decodeGoogleCredential,
+  isCredentialUsable,
+} from "./googleAuth";
 
 function credential(payload: object): string {
   const bytes = new TextEncoder().encode(JSON.stringify(payload));
@@ -31,5 +35,19 @@ describe("Google credential helpers", () => {
     expect(decodeGoogleCredential("not-a-jwt")).toBeNull();
     expect(isCredentialUsable(credential({ exp: 100 }), 75_000)).toBe(false);
     expect(isCredentialUsable(credential({ exp: 200 }), 75_000)).toBe(true);
+  });
+
+  test("reuses a valid Google JWT when Convex requests a forced token fetch", () => {
+    const token = credential({ exp: 200 });
+
+    expect(
+      convexAccessToken(token, { forceRefreshToken: false }, 75_000),
+    ).toBe(token);
+    expect(
+      convexAccessToken(token, { forceRefreshToken: true }, 75_000),
+    ).toBe(token);
+    expect(
+      convexAccessToken(token, { forceRefreshToken: true }, 175_000),
+    ).toBeNull();
   });
 });

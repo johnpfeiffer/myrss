@@ -13,6 +13,7 @@ import {
 } from "convex/react";
 
 import {
+  convexAccessToken,
   decodeGoogleCredential,
   GOOGLE_CLIENT_ID,
   isCredentialUsable,
@@ -115,16 +116,13 @@ export function useGoogleAuth(): GoogleAuthContextValue {
 function useGoogleAuthForConvex() {
   const { credential, isGoogleReady, signOut } = useGoogleAuth();
   const fetchAccessToken = useCallback(
-    async ({ forceRefreshToken }: { forceRefreshToken: boolean }) => {
-      if (
-        forceRefreshToken ||
-        !credential ||
-        !isCredentialUsable(credential)
-      ) {
+    async (options: { forceRefreshToken: boolean }) => {
+      const token = convexAccessToken(credential, options);
+      if (!token) {
         signOut();
         return null;
       }
-      return credential;
+      return token;
     },
     [credential, signOut],
   );

@@ -39,11 +39,15 @@ npm run dev
 Open the local address printed by Vite.
 
 Google Identity Services uses the public web client ID in
-`app/models/googleAuth.ts`. In the Google Cloud console, add the local Vite
-origin (normally `http://localhost:5173`) and each deployed origin to that OAuth
-client's **Authorized JavaScript origins**. This ID-token flow does not use a
-client secret or redirect URI. Restart `npx convex dev` after changing
-`convex/auth.config.ts` so Convex deploys the JWT verification configuration.
+`app/models/googleAuth.ts`. In the Google Cloud console, the OAuth client must
+be a **Web application**. For local development, Google requires both
+`http://localhost` and the local Vite origin (normally
+`http://localhost:5173`) in **Authorized JavaScript origins**. Add each deployed
+origin there as well. The app supplies Google's required localhost referrer
+policy. This ID-token callback flow does not use a client secret or redirect
+URI, so redirect URIs for other integrations may coexist without affecting it.
+Restart `npx convex dev` after changing `convex/auth.config.ts` so Convex deploys
+the JWT verification configuration.
 
 The graph viewer is available from the **View favorites graph** button or at the
 relative `graph` route (for example, `/favorites/graph` when the app is mounted
@@ -98,6 +102,21 @@ server functions. The JWT is cached only in session storage and is cleared on
 sign-out or shortly before expiration; there is intentionally no application
 session or refresh-token service yet.
 
+### Post-login token lifecycle
+
+`ConvexProviderWithAuth` first sends the cached Google JWT to Convex. After the
+server confirms it, Convex immediately calls the auth adapter again with
+`forceRefreshToken: true`. Google Identity Services does not expose a silent
+refresh-token API for this callback flow, so the adapter returns the same JWT
+while it remains valid. Here, “forced” means bypassing an auth-provider cache;
+it does not mean the current token is invalid or that the user should be signed
+out. Malformed, expired, or nearly expired JWTs still clear the local auth state
+and return the user to Google's sign-in button.
+
+This distinction is covered by a regression test. Treating every forced fetch
+as sign-out allows the backend to authenticate and briefly run user queries,
+but tears down the app UI immediately afterward.
+
 To preserve `INV-001`, the first verified Google sign-in creates a UUIDv1 user
 record and binds it to Google's stable token identifier. If the current browser
 already has an older device-local UUIDv1 user, that unclaimed record is linked
@@ -106,4 +125,3 @@ UUIDv1 through the verified Google identity. Favorites functions never accept a
 caller-supplied owner ID.
 
 See [architecture.md](architecture.md) for the system design and user journey. The governing requirements remain in `KERNEL/`; derived interpretations and checks are in `SPEC/` and `VALIDATION/`.
-

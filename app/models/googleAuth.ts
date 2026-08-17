@@ -59,3 +59,15 @@ export function isCredentialUsable(
   const profile = decodeGoogleCredential(credential);
   return profile !== null && profile.expiresAt - expirationLeewayMs > now;
 }
+
+export function convexAccessToken(
+  credential: string | null,
+  options: { forceRefreshToken: boolean },
+  now = Date.now(),
+): string | null {
+  // Google Identity Services does not expose a silent refresh-token API for
+  // this callback flow. Convex also makes a forced fetch immediately after it
+  // confirms the initial token, so the same JWT must be reused while valid.
+  void options.forceRefreshToken;
+  return credential && isCredentialUsable(credential, now) ? credential : null;
+}

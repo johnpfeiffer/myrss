@@ -39,6 +39,43 @@ The `by_token_identifier` index maps the verified Google identity to the kernel-
 
 The submitted URL is stored unchanged. The `by_user_and_unique_id` index finds exact duplicates efficiently; a user-scoped transactional comparison also removes one trailing path slash solely for duplicate detection. Duplicate insertion is rejected as an expected application error. The `by_user_id` index scopes reactive list queries to one authenticated user. The view orders its reactive result by modified date or URL ID without modifying persisted records.
 
+## Authentication token lifecycle
+
+Google's credential callback supplies a short-lived ID-token JWT. The React auth
+provider stores it for the browser-tab session and gives it to
+`ConvexProviderWithAuth`. Convex validates the token, reports authentication,
+and then immediately performs a forced token fetch. Because Google Identity
+Services does not provide a silent refresh-token API for this callback flow,
+the adapter returns the same JWT when it is still usable. A forced fetch is a
+request to bypass provider caching, not an instruction to sign out.
+
+```mermaid
+sequenceDiagram
+    participant Google as Google Identity Services
+    participant Adapter as React auth adapter
+    participant Convex as Convex auth client/server
+    participant App as Authenticated app UI
+
+    Google-->>Adapter: Credential callback with ID-token JWT
+    Adapter->>Convex: Initial token fetch
+    Convex->>Convex: Verify signature, issuer, audience, expiry
+    Convex-->>Adapter: Authentication confirmed
+    Convex->>Adapter: Forced token fetch
+    alt JWT is still usable
+        Adapter-->>Convex: Reuse the same Google JWT
+        Convex-->>App: Keep authenticated UI mounted
+    else JWT is malformed or nearly expired
+        Adapter-->>Convex: No token
+        Adapter-->>App: Clear auth and show Google sign-in
+    end
+```
+
+The regression observed during integration authenticated successfully and even
+ran `users:ensure` and `trackedItems:list`, but the adapter interpreted the
+immediate forced fetch as sign-out and dismantled the UI. Token selection now
+lives in the framework-independent auth model and is tested for both normal and
+forced fetches.
+
 ## User journey
 
 ```mermaid
@@ -102,7 +139,7 @@ sequenceDiagram
 
 - Convex API tests prove UUIDv1 validation, idempotent users, exact and trailing-slash duplicate rejection, selectable initial status, same-status no-ops, ownership-scoped reads, ISO timestamps, and unrestricted status transitions.
 - Authentication tests prove unauthenticated calls are rejected, one Google identity resolves idempotently, different Google identities remain isolated, and an existing unclaimed browser user retains its favorites when linked.
-- JWT model tests prove display claims decode without treating them as authorization and expired credentials are rejected before being sent to Convex.
+- JWT model tests prove display claims decode without treating them as authorization, valid JWTs survive Convex's immediate forced fetch, and expired credentials are rejected before being sent to Convex.
 - Presentation tests prove the Feneky and graph header links, loading and empty feedback, exact URL and initial-status submission, duplicate feedback, Date/ID sorting, listing collapse, inline status changes, cancellation confirmation, graph rendering, relationship filtering, and absence of a detail panel.
 - Graph model tests prove dangling relationships are rejected, all valid entities receive a layout position, connected entities cluster together, and hubs sit inside their lower-degree neighbors.
 - TypeScript production builds verify the generated Convex data model and UI integration.
@@ -110,4 +147,4 @@ sequenceDiagram
 
 ## Current boundary
 
-The app deliberately reuses Google's short-lived ID-token JWT and does not issue its own session, refresh token, or cookie. The token is held in session storage for reloads within the same browser tab and cleared shortly before expiry or on sign-out. An expired token returns the user to Google's explicit sign-in button so Google can issue a new credential. Authorization remains server-side: client-decoded name, email, and picture claims are display-only.
+The app deliberately reuses Google's short-lived ID-token JWT and does not issue its own session, refresh token, or cookie. The token is held in session storage for reloads within the same browser tab and cleared shortly before expiry or on sign-out. Convex requests a forced token fetch immediately after confirming initial authentication; because this Google callback flow has no silent refresh-token API, the adapter returns the same JWT while it remains valid. An expired token returns the user to Google's explicit sign-in button so Google can issue a new credential. Authorization remains server-side: client-decoded name, email, and picture claims are display-only.
