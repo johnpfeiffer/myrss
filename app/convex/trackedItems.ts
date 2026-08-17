@@ -2,18 +2,18 @@ import { ConvexError, v } from "convex/values";
 
 import {
   assertLinkUrl,
-  assertUuidV1,
   statusDatePatch,
   trailingSlashDuplicateKey,
 } from "../models/trackedItem";
+import { requireUserId } from "./auth";
 import { mutation, query } from "./_generated/server";
 import { statusValidator, trackedItemValidator } from "./validators";
 
 export const list = query({
-  args: { userId: v.string() },
+  args: {},
   returns: v.array(trackedItemValidator),
-  handler: async (ctx, { userId }) => {
-    assertUuidV1(userId);
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
 
     return await ctx.db
       .query("trackedItems")
@@ -25,22 +25,13 @@ export const list = query({
 
 export const add = mutation({
   args: {
-    userId: v.string(),
     url: v.string(),
     status: v.optional(statusValidator),
   },
   returns: trackedItemValidator,
-  handler: async (ctx, { userId, url, status }) => {
-    assertUuidV1(userId);
+  handler: async (ctx, { url, status }) => {
     assertLinkUrl(url);
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_user_id", (index) => index.eq("userId", userId))
-      .unique();
-    if (!user) {
-      throw new Error("User must be registered before adding favorites");
-    }
+    const userId = await requireUserId(ctx);
 
     const exactExisting = await ctx.db
       .query("trackedItems")
@@ -84,13 +75,12 @@ export const add = mutation({
 
 export const updateStatus = mutation({
   args: {
-    userId: v.string(),
     itemId: v.id("trackedItems"),
     status: statusValidator,
   },
   returns: trackedItemValidator,
-  handler: async (ctx, { userId, itemId, status }) => {
-    assertUuidV1(userId);
+  handler: async (ctx, { itemId, status }) => {
+    const userId = await requireUserId(ctx);
 
     const item = await ctx.db.get(itemId);
     if (!item || item.userId !== userId) {

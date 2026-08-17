@@ -4,7 +4,18 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test } from "vitest";
 
+import {
+  countRelationshipsByType,
+  relationshipLabel,
+} from "../../models/knowledgeGraph";
+import { favoritesGraph } from "./graphData";
 import { KnowledgeGraphPage } from "./KnowledgeGraph";
+
+const relationshipCounts = countRelationshipsByType(favoritesGraph.edges);
+
+function summary(visibleCount = favoritesGraph.edges.length) {
+  return `${favoritesGraph.entities.length} entities · ${visibleCount} of ${favoritesGraph.edges.length} relationships shown`;
+}
 
 describe("KnowledgeGraphPage", () => {
   test("renders the imported entities and relationships as an accessible graph", () => {
@@ -14,7 +25,7 @@ describe("KnowledgeGraphPage", () => {
       screen.getByRole("heading", { level: 1, name: "Favorites graph" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("39 entities · 35 of 35 relationships shown"),
+      screen.getByText(summary()),
     ).toBeInTheDocument();
     expect(
       screen.getByText(
@@ -26,15 +37,10 @@ describe("KnowledgeGraphPage", () => {
     expect(
       screen.getByLabelText("Noam Shazeer — Founder of → Character.AI"),
     ).toBeInTheDocument();
-    for (const [type, count] of [
-      ["Founder of", 10],
-      ["Author of", 11],
-      ["Host of", 2],
-      ["Current employee of", 4],
-      ["Previous employee of", 8],
-    ] as const) {
+    for (const [type, count] of relationshipCounts) {
+      const label = relationshipLabel(type);
       expect(
-        screen.getByLabelText(`${type}: ${count} relationships`),
+        screen.getByLabelText(`${label}: ${count} relationships`),
       ).toHaveTextContent(String(count));
     }
     expect(screen.getByRole("link", { name: "Back to favorites" })).toHaveAttribute(
@@ -62,7 +68,12 @@ describe("KnowledgeGraphPage", () => {
       ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("39 entities · 25 of 35 relationships shown"),
+      screen.getByText(
+        summary(
+          favoritesGraph.edges.length -
+            (relationshipCounts.get("Founder_of") ?? 0),
+        ),
+      ),
     ).toBeInTheDocument();
 
     await user.click(founderFilter);

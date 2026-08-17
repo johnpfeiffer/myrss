@@ -3,6 +3,7 @@ import {
   Suspense,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
 } from "react";
@@ -29,11 +30,15 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useMutation, useQuery } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
 
 import { api } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
+import {
+  renderGoogleSignInButton,
+  useGoogleAuth,
+} from "./GoogleAuth";
 import {
   assertUuidV1,
   assertLinkUrl,
@@ -57,6 +62,8 @@ interface FavoritesViewProps {
     status: TrackedItemStatus,
   ) => Promise<void>;
   error?: string | null;
+  onSignOut?: () => void;
+  userLabel?: string;
 }
 
 function readableDate(value: string): string {
@@ -75,6 +82,8 @@ export function FavoritesView({
   onAdd,
   onStatusChange,
   error,
+  onSignOut,
+  userLabel,
 }: FavoritesViewProps) {
   const [url, setUrl] = useState("");
   const [initialStatus, setInitialStatus] =
@@ -166,6 +175,11 @@ export function FavoritesView({
               My favorite links
             </Typography>
             <Stack spacing={1} sx={{ alignItems: { xs: "stretch", sm: "flex-end" } }}>
+              {userLabel ? (
+                <Typography color="text.secondary" variant="body2">
+                  Signed in as {userLabel}
+                </Typography>
+              ) : null}
               <Button
                 component="a"
                 href="https://feneky.com/links"
@@ -184,6 +198,15 @@ export function FavoritesView({
               >
                 View favorites graph
               </Button>
+              {onSignOut ? (
+                <Button
+                  onClick={onSignOut}
+                  size="small"
+                  sx={{ textTransform: "none" }}
+                >
+                  Sign out
+                </Button>
+              ) : null}
             </Stack>
           </Stack>
 
@@ -434,22 +457,26 @@ function getOrCreateUserId(): string {
 
 function FavoritesController() {
   const [userId] = useState(getOrCreateUserId);
+  const [userReady, setUserReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { profile, signOut } = useGoogleAuth();
   const ensureUser = useMutation(api.users.ensure);
   const addFavorite = useMutation(api.trackedItems.add);
   const updateFavoriteStatus = useMutation(api.trackedItems.updateStatus);
-  const items = useQuery(api.trackedItems.list, { userId });
+  const items = useQuery(api.trackedItems.list, userReady ? {} : "skip");
 
   useEffect(() => {
-    void ensureUser({ userId }).catch((cause: unknown) => {
-      setError(cause instanceof Error ? cause.message : "User setup failed.");
-    });
+    void ensureUser({ proposedUserId: userId })
+      .then(() => setUserReady(true))
+      .catch((cause: unknown) => {
+        setError(cause instanceof Error ? cause.message : "User setup failed.");
+      });
   }, [ensureUser, userId]);
 
   async function handleAdd(url: string, status: TrackedItemStatus) {
     setError(null);
-    await ensureUser({ userId });
-    await addFavorite({ userId, url, status });
+    await ensureUser({ proposedUserId: userId });
+    await addFavorite({ url, status });
   }
 
   async function handleStatusChange(
@@ -458,9 +485,8 @@ function FavoritesController() {
   ) {
     setError(null);
     try {
-      await ensureUser({ userId });
+      await ensureUser({ proposedUserId: userId });
       await updateFavoriteStatus({
-        userId,
         itemId: itemId as Id<"trackedItems">,
         status,
       });
@@ -476,13 +502,69 @@ function FavoritesController() {
       error={error}
       items={items}
       onAdd={handleAdd}
+      onSignOut={signOut}
       onStatusChange={handleStatusChange}
+      userLabel={profile?.email ?? profile?.name}
     />
   );
 }
 
+function GoogleSignInView() {
+  const buttonRef = useRef<HTMLDivElement>(null);
+  const { error, isGoogleReady } = useGoogleAuth();
+
+  useEffect(() => {
+    if (isGoogleReady && buttonRef.current) {
+      renderGoogleSignInButton(buttonRef.current);
+    }
+  }, [isGoogleReady]);
+
+  return (
+    <Box className="app-shell">
+      <Container component="main" maxWidth="sm" className="page-container">
+        <Paper variant="outlined" sx={{ mt: 8, p: { xs: 3, sm: 5 } }}>
+          <Stack spacing={2.5} sx={{ alignItems: "center", textAlign: "center" }}>
+            <Typography component="h1" variant="h4" sx={{ fontWeight: 700 }}>
+              My favorite links
+            </Typography>
+            <Typography color="text.secondary">
+              Sign in to keep your favorites available when you return.
+            </Typography>
+            <div ref={buttonRef} />
+            {!isGoogleReady ? <CircularProgress size={28} /> : null}
+            {error ? <Alert severity="error">{error}</Alert> : null}
+          </Stack>
+        </Paper>
+      </Container>
+    </Box>
+  );
+}
+
+function LoadingApp() {
+  return (
+    <Box className="app-shell">
+      <Container component="main" maxWidth="lg" className="page-container">
+        <Stack spacing={1.5} sx={{ alignItems: "center", py: 7 }}>
+          <CircularProgress size={28} />
+          <Typography color="text.secondary" variant="body2">
+            Checking sign-in…
+          </Typography>
+        </Stack>
+      </Container>
+    </Box>
+  );
+}
+
 function App() {
+  const { isAuthenticated, isLoading } = useConvexAuth();
   const path = window.location.pathname.replace(/\/+$/, "");
+
+  if (isLoading) {
+    return <LoadingApp />;
+  }
+  if (!isAuthenticated) {
+    return <GoogleSignInView />;
+  }
 
   return path.endsWith("/graph") ? (
     <Suspense

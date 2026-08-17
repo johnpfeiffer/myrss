@@ -6,8 +6,11 @@ This document is derived from `/KERNEL/` and records the implementation interpre
 
 ### User
 
-- `userId`: a unique UUIDv1 string generated for a browser-local user.
+- `userId`: a unique UUIDv1 string bound to one verified Google token identifier.
+- `tokenIdentifier`: the stable issuer-plus-subject identity derived by Convex from a verified Google ID-token JWT.
 - Convex's internal document ID is storage infrastructure and does not replace `userId`.
+- Public favorites functions derive the owner from the authenticated identity and never trust a caller-supplied `userId`.
+- An existing unclaimed browser-local UUIDv1 may be linked once during the migration to authenticated identity.
 
 ### Tracked item
 
@@ -27,8 +30,8 @@ An item's `uniqueId` cannot be changed after creation.
 
 ## MVP behavior
 
-1. On first use, the browser creates and retains a UUIDv1 user ID.
-2. The app registers that user in Convex idempotently.
+1. On first use, the user signs in through Google Identity Services and the browser passes Google's ID-token JWT to Convex.
+2. Convex verifies the JWT issuer, audience, signature, and expiry. The app then idempotently resolves or creates the Google identity's UUIDv1 user, claiming a matching unclaimed browser-local user when present.
 3. The user can add a valid HTTP or HTTPS URL. The exact submitted string is stored, and the initial status defaults to `todo` but may be chosen from any valid status.
 4. Re-adding the same URL, including a variant differing only by one trailing path slash, is rejected with a helpful error and does not create a duplicate.
 5. The user can view their items and change any item directly to any valid status. Changing to `cancelled` requires UI confirmation.
@@ -38,6 +41,7 @@ An item's `uniqueId` cannot be changed after creation.
 9. The interface shows loading, empty, success, and error states.
 10. The interface uses a responsive single-list layout with inline status controls built with Material UI defaults.
 11. The header links to `https://feneky.com/links` with the text “Find your next great thing!”
+12. The signed-in view identifies the Google account and supports sign-out. The ID token is retained only for the browser tab session and is discarded shortly before expiry; the user signs in again rather than using an application-owned refresh session.
 
 ## Architecture mapping
 

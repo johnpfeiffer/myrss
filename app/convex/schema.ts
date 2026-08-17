@@ -4,7 +4,10 @@ import { v } from "convex/values";
 export default defineSchema({
   users: defineTable({
     userId: v.string(),
-  }).index("by_user_id", ["userId"]),
+    tokenIdentifier: v.optional(v.string()),
+  })
+    .index("by_user_id", ["userId"])
+    .index("by_token_identifier", ["tokenIdentifier"]),
 
   trackedItems: defineTable({
     userId: v.string(),

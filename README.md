@@ -1,6 +1,6 @@
 # Favorites
 
-A small Convex and React app for tracking progress through saved links. Each browser gets a UUIDv1 user identity, while favorites and their status history are stored durably in Convex.
+A small Convex and React app for tracking progress through saved links. Google Sign-In identifies returning users, while favorites and their status history are stored durably in Convex.
 
 ## Features
 
@@ -16,6 +16,8 @@ A small Convex and React app for tracking progress through saved links. Each bro
 - Explore imported entities in connected clusters where node size and placement
   emphasize highly connected hubs.
 - Select or deselect relationship types without moving the graph nodes.
+- Return from another browser with the same Google account and see the same favorites.
+- Verify Google ID tokens in Convex before favorites data can be read or changed.
 
 ## Local development
 
@@ -35,6 +37,13 @@ npm run dev
 ```
 
 Open the local address printed by Vite.
+
+Google Identity Services uses the public web client ID in
+`app/models/googleAuth.ts`. In the Google Cloud console, add the local Vite
+origin (normally `http://localhost:5173`) and each deployed origin to that OAuth
+client's **Authorized JavaScript origins**. This ID-token flow does not use a
+client secret or redirect URI. Restart `npx convex dev` after changing
+`convex/auth.config.ts` so Convex deploys the JWT verification configuration.
 
 The graph viewer is available from the **View favorites graph** button or at the
 relative `graph` route (for example, `/favorites/graph` when the app is mounted
@@ -67,12 +76,34 @@ The runnable project lives in `app/`. From the repository root, copy its deploym
 ./cloud-deploy.sh
 ```
 
-This targets `../codespaces-react/apps/track-favorites/` and excludes dependencies, build output, local environment files, and tests. The monorepo build environment must provide `VITE_CONVEX_URL` for the intended Convex deployment.
+This targets `../codespaces-react/apps/track-favorites/` and excludes dependencies, build output, local environment files, and tests. The monorepo build environment must provide `VITE_CONVEX_URL` for the intended Convex deployment. Deploy the Convex functions as well so the Google auth provider and authenticated function signatures match the UI.
 
 Set `DEST` to override the copy destination for validation or another checkout.
 
-## Identity note
+### Convex
 
-The MVP stores a generated UUIDv1 in browser local storage and uses it as the user identity. Favorites themselves live in Convex; local storage is not the source of truth for tracked items. This device-local identity is intentionally simple and is not authentication.
+Ensure the VITE_CONVEX_URL variable is set (i.e. in Cloudflare)
+
+Also, in the dev environment logged into convex, run:
+
+`npx convex deploy --cmd 'npm run build'`
+
+<https://docs.convex.dev/production/hosting/custom>
+
+## Authentication and identity
+
+The browser sends Google's ID-token JWT directly to Convex. Convex verifies its
+issuer, signature, expiry, and audience before exposing the Google identity to
+server functions. The JWT is cached only in session storage and is cleared on
+sign-out or shortly before expiration; there is intentionally no application
+session or refresh-token service yet.
+
+To preserve `INV-001`, the first verified Google sign-in creates a UUIDv1 user
+record and binds it to Google's stable token identifier. If the current browser
+already has an older device-local UUIDv1 user, that unclaimed record is linked
+once so its existing favorites remain available. Later browsers resolve the same
+UUIDv1 through the verified Google identity. Favorites functions never accept a
+caller-supplied owner ID.
 
 See [architecture.md](architecture.md) for the system design and user journey. The governing requirements remain in `KERNEL/`; derived interpretations and checks are in `SPEC/` and `VALIDATION/`.
+
