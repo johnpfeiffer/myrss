@@ -1,6 +1,4 @@
 import {
-  lazy,
-  Suspense,
   useEffect,
   useMemo,
   useRef,
@@ -39,6 +37,7 @@ import {
   renderGoogleSignInButton,
   useGoogleAuth,
 } from "./GoogleAuth";
+import KnowledgeGraphPage from "./graph/KnowledgeGraph";
 import {
   assertUuidV1,
   assertLinkUrl,
@@ -52,7 +51,6 @@ import {
 import "./App.css";
 
 const userStorageKey = "favorites.userId";
-const KnowledgeGraphPage = lazy(() => import("./graph/KnowledgeGraph"));
 
 interface FavoritesViewProps {
   items: TrackedItem[] | undefined;
@@ -567,22 +565,7 @@ function App() {
   }
 
   return path.endsWith("/graph") ? (
-    <Suspense
-      fallback={
-        <Box className="app-shell">
-          <Container component="main" maxWidth="lg" className="page-container">
-            <Stack spacing={1.5} sx={{ alignItems: "center", py: 7 }}>
-              <CircularProgress size={28} />
-              <Typography color="text.secondary" variant="body2">
-                Loading graph…
-              </Typography>
-            </Stack>
-          </Container>
-        </Box>
-      }
-    >
-      <KnowledgeGraphPage />
-    </Suspense>
+    <KnowledgeGraphPage />
   ) : (
     <FavoritesController />
   );

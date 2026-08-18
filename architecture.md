@@ -4,7 +4,7 @@ This document describes the implementation derived from `/KERNEL/`. The kernel r
 
 ## System design
 
-The runnable project lives under `app/` for incorporation into the `codespaces-react` monorepo. Framework-independent rules live in `app/models/`; `app/convex/` authentication, queries, and mutations act as controllers around durable storage; `app/src/` contains the React and Material UI presentation. Google Identity Services supplies an ID-token JWT, `ConvexProviderWithAuth` sends it to Convex, and `convex/auth.config.ts` configures Google as the only accepted issuer and audience.
+The runnable project lives under `app/` for incorporation into the `codespaces-react` monorepo. Framework-independent rules live in `app/models/`; `app/convex/` authentication, queries, and mutations act as controllers around durable storage; `app/src/` contains the React and Material UI presentation. Google Identity Services supplies an ID-token JWT, `ConvexProviderWithAuth` sends it to Convex, and `convex/auth.config.ts` configures Google as the only accepted issuer and audience. Vite builds the app with `base: '/'`; the monorepo's Cloudflare middleware owns the production `/track-favorites/` mount and rewrites the initial HTML response.
 
 The primary presentation is a spacious page organized into three levels: a strong page header with the Feneky and graph actions, a compact outlined add form, and a divider-based saved-links section. Link URLs receive the strongest visual emphasis; status controls and locally formatted update dates stay on the quieter second line. A relative `graph` route opens a dedicated, read-only knowledge-graph submodule. It renders connected components as separate SVG clusters, places high-degree hubs near cluster centers, moves low-degree entities toward cluster edges, and scales node circles by degree. Relationship-type chips hide or restore edges without moving nodes, preserving the user's visual map while reducing clutter. Each chip and its centered, color-matched total form a compact filter column. Material UI supplies the palette, typography, inputs, dialogs, and responsive behavior, with CSS limited to layout and spacing.
 
@@ -27,7 +27,32 @@ flowchart LR
     GraphDomain --> Layout["Connected components + degree layout"]
     Layout --> GraphView["Accessible SVG graph view"]
     Filters["Relationship-type selection"] --> GraphView
+    Build["Single-bundle Vite build at root base"] --> Middleware["Cloudflare monorepo middleware"]
+    Middleware -->|"Inject /track-favorites/ HTML base"| View
 ```
+
+## Monorepo route and asset boundary
+
+The standalone app remains unaware of the monorepo and uses Vite `base: '/'`,
+matching the established `rands-personality-game` integration. In production,
+`functions/_middleware.js` recognizes `track-favorites` as a valid app route,
+and `.github/scripts/sync.sh` mirrors the upstream `app/` directory into the
+monorepo. The middleware maps `/track-favorites/*` to the collected build and
+rewrites root-relative entry assets in `index.html`.
+
+That rewrite happens only to the initial HTML response. Vite's preload helper
+for a lazy route embeds dependency paths inside the main JavaScript bundle and
+prepends the configured root base at runtime. The original lazy graph therefore
+requested `/assets/KnowledgeGraph-*.js` and CSS: the unprefixed JavaScript URL
+returned a 404 without a MIME type even though the files existed at
+`/track-favorites/assets/`.
+
+The graph route now uses a static import, producing a single JavaScript bundle
+and a single HTML-referenced stylesheet that middleware can rewrite safely. A
+post-build verifier enforces the single-JavaScript-bundle constraint so a future
+lazy import cannot silently reintroduce the production-only failure. App-owned
+navigation continues to preserve the first `track-favorites` path segment with
+relative links and suffix-based route parsing.
 
 ## Data model
 

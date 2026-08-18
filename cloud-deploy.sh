@@ -11,6 +11,7 @@ mkdir -p "$DEST"
 rsync -av --delete \
   --exclude='node_modules/' \
   --exclude='dist/' \
+  --exclude='.sync-sha' \
   --exclude='.env' \
   --exclude='.env.*' \
   --exclude='*.test.*' \

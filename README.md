@@ -82,7 +82,22 @@ The runnable project lives in `app/`. From the repository root, copy its deploym
 
 This targets `../codespaces-react/apps/track-favorites/` and excludes dependencies, build output, local environment files, and tests. The monorepo build environment must provide `VITE_CONVEX_URL` for the intended Convex deployment. Deploy the Convex functions as well so the Google auth provider and authenticated function signatures match the UI.
 
+The app intentionally keeps Vite's `base` at `/`. In production, the
+`codespaces-react` Cloudflare middleware recognizes `track-favorites`, serves
+the app below `/track-favorites/`, injects that HTML base, and rewrites the
+root-relative entry-script and stylesheet URLs. The auto-sync script already
+mirrors `track-favorites:app`; the middleware allowlist and sync list must keep
+that name because it becomes the public route.
+
+The middleware rewrites the initial HTML response, not URLs embedded inside a
+compiled JavaScript body. For that reason the graph is statically bundled with
+the main application rather than loaded as a Vite lazy chunk. `npm run build`
+runs `scripts/verify-build.mjs`, which fails if multiple JavaScript bundles are
+emitted and could escape to `/assets/` instead of
+`/track-favorites/assets/`.
+
 Set `DEST` to override the copy destination for validation or another checkout.
+The manual copy preserves the monorepo's `.sync-sha` provenance file.
 
 ### Convex
 

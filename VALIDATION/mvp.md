@@ -18,6 +18,7 @@ These checks are derived proof obligations. They do not supersede `/KERNEL/`.
 | Presentation | UI tests cover the Feneky header link, loading, empty, initial status, duplicate feedback, collapse, Date/ID sorting, inline status handling, and cancellation confirmation without a detail panel. JWT helper tests cover profile decoding and expiry rejection. |
 | Google localhost compatibility | The HTML entry point supplies Google's required `no-referrer-when-downgrade` policy for HTTP localhost development. |
 | Convex token lifecycle | A still-valid Google JWT is reused when Convex requests a forced token fetch; malformed or nearly expired JWTs are rejected. |
+| Monorepo production assets | Vite retains `base: '/'`; the production build emits one JavaScript bundle so all required asset URLs occur in middleware-rewritten HTML rather than lazy preload code. |
 
 ## Commands
 
