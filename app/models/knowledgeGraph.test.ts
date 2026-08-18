@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import {
   createKnowledgeGraph,
+  layoutForceDirectedGraph,
   layoutKnowledgeGraph,
   relationshipLabel,
 } from "./knowledgeGraph";
@@ -56,5 +57,32 @@ describe("knowledge graph model", () => {
     expect(Math.hypot((hub?.x ?? 0) - component.x, (hub?.y ?? 0) - component.y)).toBeLessThan(
       Math.hypot((leaf?.x ?? 0) - component.x, (leaf?.y ?? 0) - component.y),
     );
+  });
+
+  test("provides a deterministic force-directed alternative layout", () => {
+    const graph = createKnowledgeGraph(
+      [
+        { id: "a", name: "A" },
+        { id: "b", name: "B" },
+        { id: "c", name: "C" },
+      ],
+      [
+        { source: "a", target: "b", type: "Related_to" },
+        { source: "b", target: "c", type: "Related_to" },
+      ],
+    );
+
+    const first = layoutForceDirectedGraph(graph);
+    const second = layoutForceDirectedGraph(graph);
+
+    expect(first).toEqual(second);
+    expect(first.entities).toHaveLength(3);
+    expect(first.entities).not.toEqual(layoutKnowledgeGraph(graph).entities);
+    for (const entity of first.entities) {
+      expect(entity.x).toBeGreaterThanOrEqual(0);
+      expect(entity.x).toBeLessThanOrEqual(first.width);
+      expect(entity.y).toBeGreaterThanOrEqual(0);
+      expect(entity.y).toBeLessThanOrEqual(first.height);
+    }
   });
 });

@@ -6,7 +6,7 @@ This document describes the implementation derived from `/KERNEL/`. The kernel r
 
 The runnable project lives under `app/` for incorporation into the `codespaces-react` monorepo. Framework-independent rules live in `app/models/`; `app/convex/` authentication, queries, and mutations act as controllers around durable storage; `app/src/` contains the React and Material UI presentation. Google Identity Services supplies an ID-token JWT, `ConvexProviderWithAuth` sends it to Convex, and `convex/auth.config.ts` configures Google as the only accepted issuer and audience. Vite builds the app with `base: '/'`; the monorepo's Cloudflare middleware owns the production `/track-favorites/` mount and rewrites the initial HTML response.
 
-The primary presentation is a spacious page organized into three levels: a strong page header with the Feneky and graph actions, a compact outlined add form, and a divider-based saved-links section. Link URLs receive the strongest visual emphasis; status controls and locally formatted update dates stay on the quieter second line. A relative `graph` route opens a dedicated, read-only knowledge-graph submodule. It renders connected components as separate SVG clusters, places high-degree hubs near cluster centers, moves low-degree entities toward cluster edges, and scales node circles by degree. Relationship-type chips hide or restore edges without moving nodes, preserving the user's visual map while reducing clutter. Each chip and its centered, color-matched total form a compact filter column. Material UI supplies the palette, typography, inputs, dialogs, and responsive behavior, with CSS limited to layout and spacing.
+The primary presentation is a spacious page organized into three levels: a strong page header with the Feneky and graph actions, a compact outlined add form, and a divider-based saved-links section. Link URLs receive the strongest visual emphasis; status controls and locally formatted update dates stay on the quieter second line. A relative `graph` route opens a dedicated, read-only knowledge-graph submodule. Its default layout renders connected components as separate SVG clusters, places high-degree hubs near cluster centers, moves low-degree entities toward cluster edges, and scales node circles by degree. A layout control offers a deterministic force-directed alternative in which relationship springs attract connected nodes while pairwise repulsion separates them. Relationship-type chips hide or restore edges without moving nodes, preserving the user's visual map while reducing clutter. `Is_a_Person` is composed from its own snapshot file but starts hidden and is omitted from both initial layout calculations so its shared `Person` target does not flatten the useful topology. Each chip and its centered, color-matched total form a compact filter column. Material UI supplies the palette, typography, inputs, dialogs, and responsive behavior, with CSS limited to layout and spacing.
 
 ```mermaid
 flowchart LR
@@ -23,10 +23,14 @@ flowchart LR
     Domain --> API
     DB --> API --> Controller --> View
     Import["Ignored IMPORT/graph sources"] --> Snapshot["Deployable graph JSON snapshot"]
-    Snapshot --> GraphDomain["Graph validation + layout model"]
-    GraphDomain --> Layout["Connected components + degree layout"]
-    Layout --> GraphView["Accessible SVG graph view"]
+    Snapshot --> Compose["Compose base + classification edges"]
+    Compose --> GraphDomain["Graph validation + layout model"]
+    GraphDomain --> Clustered["Connected components + degree layout"]
+    GraphDomain --> Force["Deterministic spring + repulsion layout"]
+    Clustered --> GraphView["Accessible SVG graph view"]
+    Force --> GraphView
     Filters["Relationship-type selection"] --> GraphView
+    Mode["Layout selection"] --> GraphView
     Build["Single-bundle Vite build at root base"] --> Middleware["Cloudflare monorepo middleware"]
     Middleware -->|"Inject /track-favorites/ HTML base"| View
 ```
@@ -139,8 +143,12 @@ sequenceDiagram
     UI-->>User: Navigate to relative graph route
     User->>UI: Follow typed entity relationships
     UI-->>User: Render clustered accessible SVG graph
+    User->>UI: Select Force-directed layout
+    UI-->>User: Reposition nodes using deterministic simulation
     User->>UI: Deselect a relationship type
     UI-->>User: Remove matching edges; keep nodes fixed
+    User->>UI: Select Is a person
+    UI-->>User: Show classification edges without recalculating node positions
     User->>UI: Select the relationship type again
     UI-->>User: Restore matching edges
     User->>UI: Return to favorites
@@ -165,8 +173,8 @@ sequenceDiagram
 - Convex API tests prove UUIDv1 validation, idempotent users, exact and trailing-slash duplicate rejection, selectable initial status, same-status no-ops, ownership-scoped reads, ISO timestamps, and unrestricted status transitions.
 - Authentication tests prove unauthenticated calls are rejected, one Google identity resolves idempotently, different Google identities remain isolated, and an existing unclaimed browser user retains its favorites when linked.
 - JWT model tests prove display claims decode without treating them as authorization, valid JWTs survive Convex's immediate forced fetch, and expired credentials are rejected before being sent to Convex.
-- Presentation tests prove the Feneky and graph header links, loading and empty feedback, exact URL and initial-status submission, duplicate feedback, Date/ID sorting, listing collapse, inline status changes, cancellation confirmation, graph rendering, relationship filtering, and absence of a detail panel.
-- Graph model tests prove dangling relationships are rejected, all valid entities receive a layout position, connected entities cluster together, and hubs sit inside their lower-degree neighbors.
+- Presentation tests prove the Feneky and graph header links, loading and empty feedback, exact URL and initial-status submission, duplicate feedback, Date/ID sorting, listing collapse, inline status changes, cancellation confirmation, graph rendering, default-off classification relationships, layout switching, relationship filtering, and absence of a detail panel.
+- Graph model tests prove dangling relationships are rejected, all valid entities receive a layout position, connected entities cluster together, hubs sit inside their lower-degree neighbors, and the force-directed simulation is deterministic and bounded.
 - TypeScript production builds verify the generated Convex data model and UI integration.
 - ESLint and npm audit cover static quality and known dependency advisories.
 

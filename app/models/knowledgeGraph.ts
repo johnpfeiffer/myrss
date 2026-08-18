@@ -189,3 +189,98 @@ export function layoutKnowledgeGraph(graph: KnowledgeGraph): KnowledgeGraphLayou
     entities,
   };
 }
+
+export function layoutForceDirectedGraph(graph: KnowledgeGraph): KnowledgeGraphLayout {
+  const initial = layoutKnowledgeGraph(graph);
+  const padding = 80;
+  const nodes = initial.entities.map((entity) => ({
+    ...entity,
+    vx: 0,
+    vy: 0,
+  }));
+  const nodeIndex = new Map(nodes.map((node, index) => [node.id, index]));
+  const springs = graph.edges.flatMap((edge) => {
+    const source = nodeIndex.get(edge.source);
+    const target = nodeIndex.get(edge.target);
+    return source === undefined || target === undefined ? [] : [{ source, target }];
+  });
+
+  for (let iteration = 0; iteration < 140; iteration += 1) {
+    const cooling = 1 - iteration / 180;
+
+    for (let leftIndex = 0; leftIndex < nodes.length; leftIndex += 1) {
+      const left = nodes[leftIndex];
+      for (let rightIndex = leftIndex + 1; rightIndex < nodes.length; rightIndex += 1) {
+        const right = nodes[rightIndex];
+        let dx = right.x - left.x;
+        let dy = right.y - left.y;
+        let distanceSquared = dx * dx + dy * dy;
+        if (distanceSquared < 1) {
+          const angle = ((leftIndex + 1) * (rightIndex + 1) * 2.399963) % (Math.PI * 2);
+          dx = Math.cos(angle);
+          dy = Math.sin(angle);
+          distanceSquared = 1;
+        }
+        const distance = Math.sqrt(distanceSquared);
+        const repulsion = Math.min(18, 7200 / distanceSquared) * cooling;
+        const forceX = (dx / distance) * repulsion;
+        const forceY = (dy / distance) * repulsion;
+        left.vx -= forceX;
+        left.vy -= forceY;
+        right.vx += forceX;
+        right.vy += forceY;
+      }
+    }
+
+    for (const spring of springs) {
+      const source = nodes[spring.source];
+      const target = nodes[spring.target];
+      const dx = target.x - source.x;
+      const dy = target.y - source.y;
+      const distance = Math.hypot(dx, dy) || 1;
+      const attraction = (distance - 135) * 0.018 * cooling;
+      const forceX = (dx / distance) * attraction;
+      const forceY = (dy / distance) * attraction;
+      source.vx += forceX;
+      source.vy += forceY;
+      target.vx -= forceX;
+      target.vy -= forceY;
+    }
+
+    for (const node of nodes) {
+      node.vx += (initial.width / 2 - node.x) * 0.0008;
+      node.vy += (initial.height / 2 - node.y) * 0.0008;
+      node.vx *= 0.78;
+      node.vy *= 0.78;
+      const speed = Math.hypot(node.vx, node.vy);
+      const speedLimit = 12 * cooling;
+      if (speed > speedLimit) {
+        node.vx = (node.vx / speed) * speedLimit;
+        node.vy = (node.vy / speed) * speedLimit;
+      }
+      node.x += node.vx;
+      node.y += node.vy;
+    }
+  }
+
+  const minX = Math.min(...nodes.map((node) => node.x));
+  const maxX = Math.max(...nodes.map((node) => node.x));
+  const minY = Math.min(...nodes.map((node) => node.y));
+  const maxY = Math.max(...nodes.map((node) => node.y));
+  const xRange = Math.max(maxX - minX, 1);
+  const yRange = Math.max(maxY - minY, 1);
+  const availableWidth = initial.width - padding * 2;
+  const availableHeight = initial.height - padding * 2;
+
+  return {
+    ...initial,
+    entities: nodes.map((node) => ({
+      id: node.id,
+      name: node.name,
+      componentId: node.componentId,
+      degree: node.degree,
+      x: padding + ((node.x - minX) / xRange) * availableWidth,
+      y: padding + ((node.y - minY) / yRange) * availableHeight,
+    })),
+  };
+}

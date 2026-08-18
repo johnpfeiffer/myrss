@@ -16,6 +16,7 @@ A small Convex and React app for tracking progress through saved links. Google S
 - Explore imported entities in connected clusters where node size and placement
   emphasize highly connected hubs.
 - Select or deselect relationship types without moving the graph nodes.
+- Compare the stable clustered layout with a deterministic force-directed view.
 - Return from another browser with the same Google account and see the same favorites.
 - Verify Google ID tokens in Convex before favorites data can be read or changed.
 
@@ -52,10 +53,17 @@ the JWT verification configuration.
 The graph viewer is available from the **View favorites graph** button or at the
 relative `graph` route (for example, `/favorites/graph` when the app is mounted
 at `/favorites/`). Its deployable data snapshot lives in `app/src/graph/data/`
-and is derived from the ignored source files in `app/IMPORT/graph/`.
-All five relationship types start selected. Select a colored relationship chip
-to remove or restore that type's edges while keeping the clustered layout stable.
-The color-matched number below each chip shows that type's total edge count.
+and is derived from the ignored source files in `app/IMPORT/graph/`. The base
+relationships live in `edges.json`; additional classification relationships in
+`is_a_person-edges.json` are composed into the same validated graph at build time.
+All relationship types except **Is a person** start selected. Its 86 edges are
+available on demand but excluded from the initial layout calculation so the
+shared `Person` target does not collapse otherwise useful clusters into one hub.
+Select a colored relationship chip to remove or restore that type's edges while
+keeping node positions stable. The color-matched number below each chip shows
+that type's total edge count. Use the **Clustered** and **Force-directed** buttons
+to switch between the stable component layout and a deterministic spring-and-
+repulsion simulation.
 
 ## Validation
 

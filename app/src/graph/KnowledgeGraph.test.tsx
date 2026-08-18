@@ -12,8 +12,9 @@ import { favoritesGraph } from "./graphData";
 import { KnowledgeGraphPage } from "./KnowledgeGraph";
 
 const relationshipCounts = countRelationshipsByType(favoritesGraph.edges);
+const defaultHiddenCount = relationshipCounts.get("Is_a_Person") ?? 0;
 
-function summary(visibleCount = favoritesGraph.edges.length) {
+function summary(visibleCount = favoritesGraph.edges.length - defaultHiddenCount) {
   return `${favoritesGraph.entities.length} entities · ${visibleCount} of ${favoritesGraph.edges.length} relationships shown`;
 }
 
@@ -37,6 +38,11 @@ describe("KnowledgeGraphPage", () => {
     expect(
       screen.getByLabelText("Noam Shazeer — Founder of → Character.AI"),
     ).toBeInTheDocument();
+    expect(relationshipCounts.get("Is_a_Person")).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Is a person" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
     for (const [type, count] of relationshipCounts) {
       const label = relationshipLabel(type);
       expect(
@@ -46,6 +52,45 @@ describe("KnowledgeGraphPage", () => {
     expect(screen.getByRole("link", { name: "Back to favorites" })).toHaveAttribute(
       "href",
       "./",
+    );
+  });
+
+  test("keeps person classification relationships off until selected", async () => {
+    const user = userEvent.setup();
+    render(<KnowledgeGraphPage />);
+
+    const personFilter = screen.getByRole("button", { name: "Is a person" });
+    expect(screen.queryByLabelText(/— Is a person → Person$/)).not.toBeInTheDocument();
+
+    await user.click(personFilter);
+
+    expect(personFilter).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getAllByLabelText(/— Is a person → Person$/)).toHaveLength(
+      defaultHiddenCount,
+    );
+    expect(screen.getByText(summary(favoritesGraph.edges.length))).toBeInTheDocument();
+  });
+
+  test("switches between clustered and force-directed layouts", async () => {
+    const user = userEvent.setup();
+    render(<KnowledgeGraphPage />);
+
+    const clusteredButton = screen.getByRole("button", { name: "Clustered" });
+    const forceButton = screen.getByRole("button", { name: "Force-directed" });
+    expect(clusteredButton).toHaveAttribute("aria-pressed", "true");
+    expect(forceButton).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("knowledge-graph-svg")).toHaveAttribute(
+      "data-layout",
+      "clustered",
+    );
+
+    await user.click(forceButton);
+
+    expect(clusteredButton).toHaveAttribute("aria-pressed", "false");
+    expect(forceButton).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("knowledge-graph-svg")).toHaveAttribute(
+      "data-layout",
+      "force-directed",
     );
   });
 
@@ -71,6 +116,7 @@ describe("KnowledgeGraphPage", () => {
       screen.getByText(
         summary(
           favoritesGraph.edges.length -
+            defaultHiddenCount -
             (relationshipCounts.get("Founder_of") ?? 0),
         ),
       ),

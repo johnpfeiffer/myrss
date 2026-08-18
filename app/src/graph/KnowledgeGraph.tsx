@@ -12,16 +12,38 @@ import {
 
 import {
   countRelationshipsByType,
+  layoutForceDirectedGraph,
   layoutKnowledgeGraph,
   relationshipLabel,
 } from "../../models/knowledgeGraph";
-import { favoritesGraph } from "./graphData";
+import {
+  defaultHiddenRelationshipTypes,
+  favoritesGraph,
+} from "./graphData";
 import "./KnowledgeGraph.css";
 
 export function KnowledgeGraphPage() {
   const theme = useTheme();
   const graphFrameRef = useRef<HTMLDivElement>(null);
-  const layout = useMemo(() => layoutKnowledgeGraph(favoritesGraph), []);
+  const [layoutMode, setLayoutMode] = useState<"clustered" | "force-directed">(
+    "clustered",
+  );
+  const layoutGraph = useMemo(
+    () => ({
+      ...favoritesGraph,
+      edges: favoritesGraph.edges.filter(
+        (edge) => !defaultHiddenRelationshipTypes.has(edge.type),
+      ),
+    }),
+    [],
+  );
+  const layout = useMemo(
+    () =>
+      layoutMode === "force-directed"
+        ? layoutForceDirectedGraph(layoutGraph)
+        : layoutKnowledgeGraph(layoutGraph),
+    [layoutGraph, layoutMode],
+  );
   const positions = useMemo(
     () => new Map(layout.entities.map((entity) => [entity.id, entity])),
     [layout.entities],
@@ -39,7 +61,12 @@ export function KnowledgeGraphPage() {
     [],
   );
   const [selectedTypes, setSelectedTypes] = useState(
-    () => new Set(relationshipTypes),
+    () =>
+      new Set(
+        relationshipTypes.filter(
+          (type) => !defaultHiddenRelationshipTypes.has(type),
+        ),
+      ),
   );
   const visibleEdges = favoritesGraph.edges.filter((edge) =>
     selectedTypes.has(edge.type),
@@ -154,6 +181,33 @@ export function KnowledgeGraphPage() {
             </Stack>
           </Box>
 
+          <Box component="section" aria-labelledby="layout-mode-title">
+            <Typography component="h2" id="layout-mode-title" variant="subtitle1">
+              Layout
+            </Typography>
+            <Typography color="text.secondary" variant="body2" sx={{ mb: 1 }}>
+              Compare stable clusters with a force-directed simulation.
+            </Typography>
+            <Stack direction="row" spacing={1}>
+              <Button
+                aria-pressed={layoutMode === "clustered"}
+                onClick={() => setLayoutMode("clustered")}
+                size="small"
+                variant={layoutMode === "clustered" ? "contained" : "outlined"}
+              >
+                Clustered
+              </Button>
+              <Button
+                aria-pressed={layoutMode === "force-directed"}
+                onClick={() => setLayoutMode("force-directed")}
+                size="small"
+                variant={layoutMode === "force-directed" ? "contained" : "outlined"}
+              >
+                Force-directed
+              </Button>
+            </Stack>
+          </Box>
+
           <Paper
             className="knowledge-graph-frame"
             ref={graphFrameRef}
@@ -162,13 +216,16 @@ export function KnowledgeGraphPage() {
             <svg
               aria-labelledby="knowledge-graph-title knowledge-graph-description"
               className="knowledge-graph-svg"
+              data-layout={layoutMode}
+              data-testid="knowledge-graph-svg"
               role="img"
               viewBox={`0 0 ${layout.width} ${layout.height}`}
             >
               <title id="knowledge-graph-title">Favorites knowledge graph</title>
               <desc id="knowledge-graph-description">
-                Connected entities form clusters. Larger central nodes have more connections,
-                and less-connected nodes sit toward cluster edges.
+                {layoutMode === "clustered"
+                  ? "Connected entities form stable clusters. Larger central nodes have more connections, and less-connected nodes sit toward cluster edges."
+                  : "Entities are positioned by a deterministic force simulation: relationships pull connected nodes together while nodes repel one another."}
               </desc>
               <defs>
                 {relationshipTypes.map((type, index) => (
@@ -190,7 +247,7 @@ export function KnowledgeGraphPage() {
                 ))}
               </defs>
 
-              {layout.components.map((component) => (
+              {layoutMode === "clustered" && layout.components.map((component) => (
                 <circle
                   cx={component.x}
                   cy={component.y}
@@ -239,9 +296,12 @@ export function KnowledgeGraphPage() {
               {layout.entities.map((entity) => {
                 const radius = nodeRadius(entity.degree);
                 const cluster = clusters.get(entity.componentId);
-                const clusterCenterX = cluster?.x ?? layout.width / 2;
+                const clusterCenterX = layoutMode === "clustered"
+                  ? cluster?.x ?? layout.width / 2
+                  : layout.width / 2;
                 const horizontalOffset = entity.x - clusterCenterX;
-                const isPrimaryCluster = (cluster?.entityIds.length ?? 0) > 5;
+                const isPrimaryCluster =
+                  layoutMode === "clustered" && (cluster?.entityIds.length ?? 0) > 5;
                 const placeLabelVertically =
                   isPrimaryCluster &&
                   Math.abs(horizontalOffset) <= radius * 1.25;
